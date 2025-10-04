@@ -1,0 +1,270 @@
+import { User, TutorProfile, StudentRequest, Lead, Interview, Location, UserRole } from '../types';
+import { mockUsers, mockTutors, mockStudentRequests, mockLeads, mockInterviews } from './mockData';
+
+const STORAGE_KEYS = {
+  USERS: 'edvora_users',
+  TUTORS: 'edvora_tutors',
+  REQUESTS: 'edvora_requests',
+  LEADS: 'edvora_leads',
+  INTERVIEWS: 'edvora_interviews',
+};
+
+class MockAPI {
+  private getFromStorage<T>(key: string, defaultValue: T[]): T[] {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : defaultValue;
+  }
+
+  private saveToStorage<T>(key: string, data: T[]): void {
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+
+  async login(email: string, password: string, role: UserRole): Promise<{ user: User; token: string }> {
+    await this.delay(500);
+    const users = this.getFromStorage(STORAGE_KEYS.USERS, mockUsers);
+    const user = users.find(u => u.email === email && u.role === role);
+    
+    if (!user) {
+      const otherRoleUser = users.find(u => u.email === email);
+      if (otherRoleUser) {
+        throw new Error(`An account exists with this email, but not as a ${role}. Try logging in as a ${otherRoleUser.role}.`);
+      }
+      throw new Error(`No ${role} account found with this email.`);
+    }
+
+    const token = btoa(`${user.id}:${Date.now()}`);
+    return { user, token };
+  }
+
+  async signup(email: string, password: string, name: string, role: string): Promise<{ user: User; token: string }> {
+    await this.delay(500);
+    const users = this.getFromStorage(STORAGE_KEYS.USERS, mockUsers);
+    
+    if (users.find(u => u.email === email)) {
+      throw new Error('Email already exists');
+    }
+
+    const newUser: User = {
+      id: `user_${Date.now()}`,
+      email,
+      name,
+      role: role as any,
+      createdAt: new Date().toISOString(),
+    };
+
+    users.push(newUser);
+    this.saveToStorage(STORAGE_KEYS.USERS, users);
+
+    const token = btoa(`${newUser.id}:${Date.now()}`);
+    return { user: newUser, token };
+  }
+
+  async getTutorProfile(userId: string): Promise<TutorProfile | null> {
+    await this.delay(300);
+    const tutors = this.getFromStorage(STORAGE_KEYS.TUTORS, mockTutors);
+    return tutors.find(t => t.userId === userId) || null;
+  }
+
+  async createTutorProfile(userId: string, data: Partial<TutorProfile>): Promise<TutorProfile> {
+    await this.delay(500);
+    const tutors = this.getFromStorage(STORAGE_KEYS.TUTORS, mockTutors);
+    
+    const newTutor: TutorProfile = {
+      id: `tutor_${Date.now()}`,
+      userId,
+      subjects: data.subjects || [],
+      classes: data.classes || [],
+      qualifications: data.qualifications || '',
+      experience: data.experience || 0,
+      pricing: data.pricing || 0,
+      location: data.location!,
+      availability: data.availability || [],
+      bio: data.bio || '',
+      status: 'pending',
+      rating: 0,
+      totalLeads: 0,
+      completedSessions: 0,
+    };
+
+    tutors.push(newTutor);
+    this.saveToStorage(STORAGE_KEYS.TUTORS, tutors);
+
+    const interview: Interview = {
+      id: `interview_${Date.now()}`,
+      tutorId: newTutor.id,
+      slot: new Date(Date.now() + 2 * 86400000).toISOString(),
+      meetLink: `https://meet.google.com/${Math.random().toString(36).substring(7)}`,
+      status: 'scheduled',
+    };
+
+    const interviews = this.getFromStorage(STORAGE_KEYS.INTERVIEWS, mockInterviews);
+    interviews.push(interview);
+    this.saveToStorage(STORAGE_KEYS.INTERVIEWS, interviews);
+
+    return newTutor;
+  }
+
+  async getInterview(tutorId: string): Promise<Interview | null> {
+    await this.delay(300);
+    const interviews = this.getFromStorage(STORAGE_KEYS.INTERVIEWS, mockInterviews);
+    return interviews.find(i => i.tutorId === tutorId) || null;
+  }
+
+  async createStudentRequest(studentId: string, studentName: string, data: Partial<StudentRequest>): Promise<StudentRequest> {
+    await this.delay(500);
+    const requests = this.getFromStorage(STORAGE_KEYS.REQUESTS, mockStudentRequests);
+    
+    const newRequest: StudentRequest = {
+      id: `req_${Date.now()}`,
+      studentId,
+      studentName,
+      class: data.class!,
+      subject: data.subject!,
+      location: data.location!,
+      budget: data.budget!,
+      timing: data.timing!,
+      description: data.description || '',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+
+    requests.push(newRequest);
+    this.saveToStorage(STORAGE_KEYS.REQUESTS, requests);
+
+    await this.matchTutors(newRequest);
+
+    return newRequest;
+  }
+
+  private async matchTutors(request: StudentRequest): Promise<void> {
+    const tutors = this.getFromStorage(STORAGE_KEYS.TUTORS, mockTutors);
+    const leads = this.getFromStorage(STORAGE_KEYS.LEADS, mockLeads);
+
+    const matchedTutors = tutors.filter(
+      t => t.status === 'approved' &&
+           t.subjects.includes(request.subject) &&
+           t.classes.includes(request.class)
+    );
+
+    matchedTutors.forEach((tutor, index) => {
+      const distance = this.calculateDistance(
+        request.location.coordinates,
+        tutor.location.coordinates
+      );
+
+      const matchScore = 100 - (distance * 2) - (Math.abs(tutor.pricing - request.budget) / 10);
+
+      const lead: Lead = {
+        id: `lead_${Date.now()}_${index}`,
+        studentRequestId: request.id,
+        tutorId: tutor.id,
+        studentRequest: request,
+        tutor,
+        status: 'pending',
+        distance: Number(distance.toFixed(2)),
+        matchScore: Number(matchScore.toFixed(0)),
+        createdAt: new Date().toISOString(),
+      };
+
+      leads.push(lead);
+    });
+
+    this.saveToStorage(STORAGE_KEYS.LEADS, leads);
+  }
+
+  private calculateDistance(coords1: [number, number], coords2: [number, number]): number {
+    const [lon1, lat1] = coords1;
+    const [lon2, lat2] = coords2;
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  async getStudentRequests(studentId: string): Promise<StudentRequest[]> {
+    await this.delay(300);
+    const requests = this.getFromStorage(STORAGE_KEYS.REQUESTS, mockStudentRequests);
+    return requests.filter(r => r.studentId === studentId);
+  }
+
+  async getMatchedTutors(requestId: string): Promise<Lead[]> {
+    await this.delay(300);
+    const leads = this.getFromStorage(STORAGE_KEYS.LEADS, mockLeads);
+    return leads.filter(l => l.studentRequestId === requestId)
+      .sort((a, b) => b.matchScore - a.matchScore);
+  }
+
+  async getTutorLeads(tutorId: string): Promise<Lead[]> {
+    await this.delay(300);
+    const leads = this.getFromStorage(STORAGE_KEYS.LEADS, mockLeads);
+    return leads.filter(l => l.tutorId === tutorId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async updateLeadStatus(leadId: string, status: 'accepted' | 'declined'): Promise<Lead> {
+    await this.delay(300);
+    const leads = this.getFromStorage(STORAGE_KEYS.LEADS, mockLeads);
+    const lead = leads.find(l => l.id === leadId);
+    
+    if (!lead) throw new Error('Lead not found');
+    
+    lead.status = status;
+    this.saveToStorage(STORAGE_KEYS.LEADS, leads);
+    return lead;
+  }
+
+  async getPendingTutors(): Promise<TutorProfile[]> {
+    await this.delay(300);
+    const tutors = this.getFromStorage(STORAGE_KEYS.TUTORS, mockTutors);
+    return tutors.filter(t => t.status === 'pending');
+  }
+
+  async approveTutor(tutorId: string): Promise<TutorProfile> {
+    await this.delay(300);
+    const tutors = this.getFromStorage(STORAGE_KEYS.TUTORS, mockTutors);
+    const tutor = tutors.find(t => t.id === tutorId);
+    
+    if (!tutor) throw new Error('Tutor not found');
+    
+    tutor.status = 'approved';
+    this.saveToStorage(STORAGE_KEYS.TUTORS, tutors);
+    return tutor;
+  }
+
+  async rejectTutor(tutorId: string): Promise<TutorProfile> {
+    await this.delay(300);
+    const tutors = this.getFromStorage(STORAGE_KEYS.TUTORS, mockTutors);
+    const tutor = tutors.find(t => t.id === tutorId);
+    
+    if (!tutor) throw new Error('Tutor not found');
+    
+    tutor.status = 'rejected';
+    this.saveToStorage(STORAGE_KEYS.TUTORS, tutors);
+    return tutor;
+  }
+
+  async getStats(): Promise<{ totalStudents: number; totalTutors: number; activeRequests: number; totalLeads: number }> {
+    await this.delay(300);
+    const users = this.getFromStorage(STORAGE_KEYS.USERS, mockUsers);
+    const requests = this.getFromStorage(STORAGE_KEYS.REQUESTS, mockStudentRequests);
+    const tutors = this.getFromStorage(STORAGE_KEYS.TUTORS, mockTutors);
+    const leads = this.getFromStorage(STORAGE_KEYS.LEADS, mockLeads);
+
+    return {
+      totalStudents: users.filter(u => u.role === 'student').length,
+      totalTutors: tutors.filter(t => t.status === 'approved').length,
+      activeRequests: requests.filter(r => r.status === 'active').length,
+      totalLeads: leads.length,
+    };
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+export const api = new MockAPI();

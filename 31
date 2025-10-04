@@ -1,0 +1,213 @@
+import React, { useState, useEffect } from 'react';
+import { api } from '../../services/api';
+import { TutorProfile } from '../../types';
+import { Users, UserCheck, FileText, TrendingUp, Loader2, Check, X } from 'lucide-react';
+
+export const AdminDashboard: React.FC = () => {
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    totalTutors: 0,
+    activeRequests: 0,
+    totalLeads: 0,
+  });
+  const [pendingTutors, setPendingTutors] = useState<TutorProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const statsData = await api.getStats();
+      setStats(statsData);
+
+      const tutorsData = await api.getPendingTutors();
+      setPendingTutors(tutorsData);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveTutor = async (tutorId: string) => {
+    try {
+      await api.approveTutor(tutorId);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to approve tutor:', error);
+    }
+  };
+
+  const handleRejectTutor = async (tutorId: string) => {
+    try {
+      await api.rejectTutor(tutorId);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to reject tutor:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-gray-600 mt-2">Manage tutors and platform statistics</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Students</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalStudents}</p>
+              </div>
+              <div className="bg-blue-100 p-3 rounded-lg">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Active Tutors</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalTutors}</p>
+              </div>
+              <div className="bg-green-100 p-3 rounded-lg">
+                <UserCheck className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Active Requests</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.activeRequests}</p>
+              </div>
+              <div className="bg-purple-100 p-3 rounded-lg">
+                <FileText className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Leads</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalLeads}</p>
+              </div>
+              <div className="bg-orange-100 p-3 rounded-lg">
+                <TrendingUp className="h-6 w-6 text-orange-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            Pending Tutor Applications ({pendingTutors.length})
+          </h2>
+
+          {pendingTutors.length === 0 ? (
+            <div className="text-center py-12">
+              <UserCheck className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No pending applications</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pendingTutors.map((tutor) => (
+                <div
+                  key={tutor.id}
+                  className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        Tutor Application #{tutor.id}
+                      </h3>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {tutor.subjects.map((subject) => (
+                          <span
+                            key={subject}
+                            className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium"
+                          >
+                            {subject}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {tutor.classes.map((cls) => (
+                          <span
+                            key={cls}
+                            className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-xs font-medium"
+                          >
+                            {cls}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Qualifications</p>
+                      <p className="font-medium text-gray-900">{tutor.qualifications}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Experience</p>
+                      <p className="font-medium text-gray-900">{tutor.experience} years</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Pricing</p>
+                      <p className="font-medium text-gray-900">₹{tutor.pricing}/hour</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Location</p>
+                      <p className="font-medium text-gray-900">{tutor.location.address || 'Location set'}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-gray-700">
+                      <strong>Bio:</strong> {tutor.bio}
+                    </p>
+                  </div>
+
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => handleApproveTutor(tutor.id)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <Check className="h-4 w-4" />
+                      <span>Approve</span>
+                    </button>
+                    <button
+                      onClick={() => handleRejectTutor(tutor.id)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                      <span>Reject</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

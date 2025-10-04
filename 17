@@ -1,0 +1,110 @@
+import { User, TutorProfile, StudentRequest, Lead, Interview, Location } from '../types';
+
+const mockLocation: Location = {
+  type: 'Point',
+  coordinates: [77.5946, 12.9716],
+  address: 'Bangalore, Karnataka',
+};
+
+export const mockUsers: User[] = [
+  {
+    id: '1',
+    email: 'student@example.com',
+    name: 'John Doe',
+    role: 'student',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: '2',
+    email: 'tutor@example.com',
+    name: 'Jane Smith',
+    role: 'tutor',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: '3',
+    email: 'admin@example.com',
+    name: 'Admin User',
+    role: 'admin',
+    createdAt: new Date().toISOString(),
+  },
+];
+
+export const mockTutors: TutorProfile[] = [
+  {
+    id: 't1',
+    userId: '2',
+    subjects: ['Mathematics', 'Physics'],
+    classes: ['Class 10', 'Class 11', 'Class 12'],
+    qualifications: 'M.Sc. Physics, B.Ed',
+    experience: 5,
+    pricing: 500,
+    location: mockLocation,
+    availability: ['Evening (4 PM - 7 PM)', 'Night (7 PM - 10 PM)'],
+    bio: 'Experienced tutor with 5+ years of teaching experience',
+    status: 'approved',
+    rating: 4.8,
+    totalLeads: 45,
+    completedSessions: 120,
+  },
+  {
+    id: 't2',
+    userId: '4',
+    subjects: ['Chemistry', 'Biology'],
+    classes: ['Class 9', 'Class 10', 'Class 11'],
+    qualifications: 'M.Sc. Chemistry',
+    experience: 3,
+    pricing: 450,
+    location: {
+      type: 'Point',
+      coordinates: [77.6033, 12.9698],
+      address: 'Indiranagar, Bangalore',
+    },
+    availability: ['Morning (6 AM - 10 AM)', 'Evening (4 PM - 7 PM)'],
+    bio: 'Passionate about teaching science subjects',
+    status: 'approved',
+    rating: 4.6,
+    totalLeads: 32,
+    completedSessions: 85,
+  },
+];
+
+export const mockStudentRequests: StudentRequest[] = [
+  {
+    id: 'sr1',
+    studentId: '1',
+    studentName: 'John Doe',
+    class: 'Class 10',
+    subject: 'Mathematics',
+    location: mockLocation,
+    budget: 600,
+    timing: ['Evening (4 PM - 7 PM)'],
+    description: 'Need help with algebra and geometry for board exams',
+    status: 'active',
+    createdAt: new Date().toISOString(),
+  },
+];
+
+export const mockLeads: Lead[] = [
+  {
+    id: 'l1',
+    studentRequestId: 'sr1',
+    tutorId: 't1',
+    studentRequest: mockStudentRequests[0],
+    tutor: mockTutors[0],
+    status: 'pending',
+    distance: 2.5,
+    matchScore: 95,
+    createdAt: new Date().toISOString(),
+  },
+];
+
+export const mockInterviews: Interview[] = [
+  {
+    id: 'i1',
+    tutorId: 't1',
+    slot: new Date(Date.now() + 86400000).toISOString(),
+    meetLink: 'https://meet.google.com/abc-defg-hij',
+    status: 'scheduled',
+  },
+];

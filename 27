@@ -1,0 +1,130 @@
+import React from 'react';
+import { Lead } from '../../types';
+import { MapPin, Star, Award, Clock, DollarSign, BookOpen } from 'lucide-react';
+
+interface MatchedTutorsListProps {
+  leads: Lead[];
+}
+
+export const MatchedTutorsList: React.FC<MatchedTutorsListProps> = ({ leads }) => {
+  if (leads.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+        <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Finding Tutors...</h3>
+        <p className="text-gray-600">We're matching you with qualified tutors. This may take a moment.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        Matched Tutors ({leads.length})
+      </h2>
+      <div className="space-y-4">
+        {leads.map((lead) => (
+          <div
+            key={lead.id}
+            className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-2">
+                  <div className="bg-indigo-100 w-12 h-12 rounded-full flex items-center justify-center">
+                    <span className="text-xl font-bold text-indigo-600">
+                      {lead.tutor.id.substring(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Tutor #{lead.tutor.id}</h3>
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                      <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      <span>{lead.tutor.rating.toFixed(1)}</span>
+                      <span>•</span>
+                      <span>{lead.tutor.completedSessions} sessions</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
+                  {lead.matchScore}% Match
+                </div>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <MapPin className="h-4 w-4 text-red-500" />
+                <span>{lead.distance.toFixed(1)} km away</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <DollarSign className="h-4 w-4 text-green-500" />
+                <span>₹{lead.tutor.pricing}/hour</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <Award className="h-4 w-4 text-blue-500" />
+                <span>{lead.tutor.experience} years exp.</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <Clock className="h-4 w-4 text-orange-500" />
+                <span>{lead.tutor.availability.length} slots</span>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Subjects:</p>
+              <div className="flex flex-wrap gap-2">
+                {lead.tutor.subjects.map((subject) => (
+                  <span
+                    key={subject}
+                    className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium"
+                  >
+                    {subject}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Classes:</p>
+              <div className="flex flex-wrap gap-2">
+                {lead.tutor.classes.map((cls) => (
+                  <span
+                    key={cls}
+                    className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-xs font-medium"
+                  >
+                    {cls}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">{lead.tutor.bio}</p>
+
+            <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600">
+              <strong>Qualifications:</strong> {lead.tutor.qualifications}
+            </div>
+
+            <div className="mt-4">
+              <span
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  lead.status === 'pending'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : lead.status === 'accepted'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+              >
+                {lead.status === 'pending' && 'Waiting for tutor response'}
+                {lead.status === 'accepted' && 'Accepted - Contact tutor to schedule'}
+                {lead.status === 'declined' && 'Declined by tutor'}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};

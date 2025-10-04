@@ -1,0 +1,178 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
+import { TutorProfile, Interview, Lead } from '../../types';
+import { Loader2, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { TutorApplicationForm } from '../../components/tutor/TutorApplicationForm';
+import { TutorLeadsList } from '../../components/tutor/TutorLeadsList';
+
+export const TutorDashboard: React.FC = () => {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<TutorProfile | null>(null);
+  const [interview, setInterview] = useState<Interview | null>(null);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const tutorProfile = await api.getTutorProfile(user.id);
+      setProfile(tutorProfile);
+
+      if (tutorProfile) {
+        const interviewData = await api.getInterview(tutorProfile.id);
+        setInterview(interviewData);
+
+        if (tutorProfile.status === 'approved') {
+          const leadsData = await api.getTutorLeads(tutorProfile.id);
+          setLeads(leadsData);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLeadUpdate = async (leadId: string, status: 'accepted' | 'declined') => {
+    try {
+      await api.updateLeadStatus(leadId, status);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to update lead:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+            <div className="text-center mb-8">
+              <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="h-8 w-8 text-indigo-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Edvora!</h2>
+              <p className="text-gray-600">Complete your profile to start receiving leads</p>
+            </div>
+            <TutorApplicationForm onSuccess={loadData} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Tutor Dashboard</h1>
+          <p className="text-gray-600 mt-2">Manage your profile and leads</p>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Leads</p>
+                <p className="text-3xl font-bold text-gray-900">{profile.totalLeads}</p>
+              </div>
+              <div className="bg-indigo-100 p-3 rounded-lg">
+                <CheckCircle className="h-6 w-6 text-indigo-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Completed Sessions</p>
+                <p className="text-3xl font-bold text-gray-900">{profile.completedSessions}</p>
+              </div>
+              <div className="bg-green-100 p-3 rounded-lg">
+                <Clock className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Rating</p>
+                <p className="text-3xl font-bold text-gray-900">{profile.rating.toFixed(1)} ⭐</p>
+              </div>
+              <div className="bg-yellow-100 p-3 rounded-lg">
+                <AlertCircle className="h-6 w-6 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {profile.status === 'pending' && interview && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start space-x-3">
+              <Clock className="h-6 w-6 text-yellow-600 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-yellow-900 mb-2">Interview Scheduled</h3>
+                <p className="text-yellow-800 mb-3">
+                  Your AI interview is scheduled. Please join at the scheduled time.
+                </p>
+                <div className="bg-white rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Scheduled Time:</span>
+                    <span className="text-sm text-gray-900">
+                      {new Date(interview.slot).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Meet Link:</span>
+                    <a
+                      href={interview.meetLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      Join Interview
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {profile.status === 'rejected' && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="h-6 w-6 text-red-600 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-semibold text-red-900 mb-2">Application Not Approved</h3>
+                <p className="text-red-800">
+                  Unfortunately, your application was not approved at this time. Please contact support for more information.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {profile.status === 'approved' && (
+          <TutorLeadsList leads={leads} onUpdateLead={handleLeadUpdate} />
+        )}
+      </div>
+    </div>
+  );
+};

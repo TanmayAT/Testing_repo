@@ -1,0 +1,275 @@
+import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
+import { SUBJECTS, CLASSES, TIME_SLOTS } from '../../types';
+import { X, MapPin, Loader2 } from 'lucide-react';
+
+interface StudentRequestFormProps {
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export const StudentRequestForm: React.FC<StudentRequestFormProps> = ({ onClose, onSuccess }) => {
+  const { user } = useAuth();
+  const [formData, setFormData] = useState({
+    class: '',
+    subject: '',
+    budget: '',
+    timing: [] as string[],
+    description: '',
+    latitude: '',
+    longitude: '',
+    address: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [gettingLocation, setGettingLocation] = useState(false);
+
+  const getLocation = () => {
+    setGettingLocation(true);
+    setError(''); // Clear previous errors
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setFormData({
+            ...formData,
+            latitude: position.coords.latitude.toString(),
+            longitude: position.coords.longitude.toString(),
+            address: 'Current Location (fetched)',
+          });
+          setGettingLocation(false);
+        },
+        (err: GeolocationPositionError) => {
+          console.error("Geolocation error:", err);
+          let errorMessage = 'Could not get location. Please enter coordinates manually.';
+          if (err.code === 1) { // PERMISSION_DENIED
+            errorMessage = 'Geolocation is disabled. Please check your browser settings or enter your location manually.';
+          } else if (err.code === 2) { // POSITION_UNAVAILABLE
+            errorMessage = 'Location information is unavailable. Please try again or enter manually.';
+          }
+          setError(errorMessage);
+          setGettingLocation(false);
+        }
+      );
+    } else {
+      setError('Geolocation is not supported by your browser. Please enter coordinates manually.');
+      setGettingLocation(false);
+    }
+  };
+
+  const toggleTiming = (slot: string) => {
+    setFormData({
+      ...formData,
+      timing: formData.timing.includes(slot)
+        ? formData.timing.filter(t => t !== slot)
+        : [...formData.timing, slot],
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!formData.latitude || !formData.longitude) {
+      setError('Please set your location');
+      return;
+    }
+
+    if (formData.timing.length === 0) {
+      setError('Please select at least one timing slot');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await api.createStudentRequest(user!.id, user!.name, {
+        class: formData.class,
+        subject: formData.subject,
+        budget: Number(formData.budget),
+        timing: formData.timing,
+        description: formData.description,
+        location: {
+          type: 'Point',
+          coordinates: [Number(formData.longitude), Number(formData.latitude)],
+          address: formData.address,
+        },
+      });
+      onSuccess();
+    } catch (err) {
+      setError('Failed to create request');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Post a Request</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Class *</label>
+              <select
+                required
+                value={formData.class}
+                onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">Select Class</option>
+                {CLASSES.map((cls) => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
+              <select
+                required
+                value={formData.subject}
+                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">Select Subject</option>
+                {SUBJECTS.map((subject) => (
+                  <option key={subject} value={subject}>{subject}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Budget (₹/hour) *</label>
+            <input
+              type="number"
+              required
+              min="0"
+              value={formData.budget}
+              onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Timing *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {TIME_SLOTS.map((slot) => (
+                <button
+                  key={slot}
+                  type="button"
+                  onClick={() => toggleTiming(slot)}
+                  className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                    formData.timing.includes(slot)
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
+                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                  }`}
+                >
+                  {slot}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Location *</label>
+            <div className="flex space-x-2 mb-2">
+              <button
+                type="button"
+                onClick={getLocation}
+                disabled={gettingLocation}
+                className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {gettingLocation ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Getting location...</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4" />
+                    <span>Use Current Location</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                step="any"
+                placeholder="Latitude"
+                value={formData.latitude}
+                onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+              <input
+                type="number"
+                step="any"
+                placeholder="Longitude"
+                value={formData.longitude}
+                onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Address (optional)"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={4}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="Describe your requirements..."
+            />
+          </div>
+
+          <div className="flex space-x-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <span>Post Request</span>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
